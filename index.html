@@ -10,7 +10,7 @@
 html,body{margin:0;height:100%;background:#080c14;color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
 #cv{display:block;width:100%;height:100%;touch-action:none}
 .top{position:fixed;left:0;right:0;top:0;padding:10px 12px;pointer-events:none}
-.readout{font:13px ui-monospace,Menlo,monospace;color:var(--cyan);line-height:1.75;background:rgba(8,12,20,.72);display:inline-block;padding:6px 10px;border-radius:8px}
+.readout{font:13px ui-monospace,Menlo,monospace;color:var(--cyan);line-height:1.75;background:rgba(8,12,20,.72);display:inline-block;padding:6px 10px;border-radius:8px;max-width:96vw}
 .readout b{color:#fff}
 .hint{font-size:11px;color:var(--muted);margin-top:4px}
 .bar{position:fixed;left:0;right:0;bottom:0;background:rgba(11,17,26,.95);border-top:1px solid var(--line);padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
@@ -22,22 +22,23 @@ html,body{margin:0;height:100%;background:#080c14;color:var(--text);font-family:
 button{background:#1c2737;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12px}
 button.on{background:#2b3f26;border-color:#5f8a4a;color:#b8e89c}
 button.cp{background:#233a52;border-color:#3d6a94;color:#9fd0f5}
+button.warn{background:#4a2530;border-color:#94566a;color:#f5b0c0}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 <div class="top">
 <div class="readout" id="readout">加载中…</div>
-<div class="hint">点地图任意处移动船员 · 拖滑杆实时看效果 · 调好点"复制参数"</div>
+<div class="hint">点地图移动船员 · 拖滑杆调视野 · 刷到可透视的地方就开“画墙”补一条</div>
 </div>
 <div class="bar">
 <div class="row"><label>视野半径</label><input id="r" type="range" min="120" max="520" value="270" step="5"><output id="ro">270</output></div>
 <div class="row"><label>暗区浓度</label><input id="d" type="range" min="0.20" max="0.95" value="0.80" step="0.01"><output id="do">0.80</output></div>
 <div class="row"><label>过渡带</label><input id="s" type="range" min="0.05" max="0.80" value="0.30" step="0.01"><output id="so">30%</output></div>
-<div class="btns"><button id="bRay">射线</button><button id="bWall" class="on">墙线</button><button id="bGod">全局</button><button id="bCopy" class="cp">复制参数</button></div>
+<div class="btns"><button id="bWall" class="on">墙线</button><button id="bRay">射线</button><button id="bGod">全局</button><button id="bDraw" class="warn">画墙</button><button id="bUndo">摇销</button><button id="bCopy" class="cp">复制参数</button><button id="bDump" class="cp">导出补墙</button></div>
 </div>
 <script>
-var WALLS_URL='https://aka.doubaocdn.com/s/3FjAdtUDaY';
+var WALLS_URL='https://aka.doubaocdn.com/s/uUNVXWhwDq';
 var MAP_SRC='https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/WAdKb86uGoPTgNxe6vpcslYkngf';
 var CREW_SRC='https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/FZEfb6UEvojn70x3rsKcItMdn5g';
 var VIEWW=780;
@@ -47,6 +48,7 @@ var fcv=document.createElement('canvas'),fctx=fcv.getContext('2d');
 var dpr=1,VW=0,VH=0,scale=1,camX=0,camY=0,MAPW=2040,MAPH=1140;
 var SEGS=[],CORNERS=[],ready=false;
 var me={x:1180,y:330},showRay=false,showWall=true,god=false;
+var drawing=false,p1=null,manual=[];
 var mapImg=new Image(),crewImg=new Image();
 mapImg.src=MAP_SRC;crewImg.src=CREW_SRC;
 function addSeg(ax,ay,bx,by){SEGS.push({a:{x:ax,y:ay},b:{x:bx,y:by},minx:Math.min(ax,bx),miny:Math.min(ay,by),maxx:Math.max(ax,bx),maxy:Math.max(ay,by)});CORNERS.push({x:ax,y:ay});}
@@ -59,17 +61,30 @@ function visibility(o,R){var segs=SEGS.filter(function(s){return segNear(s,o,R);
 function radialFade(d,R,softStart){var band=Math.max(1,R-R*softStart);var t=Math.max(0,Math.min(1,(R-d)/band));return t*t*(3-2*t);}
 function polyPath(c,o,pts){c.beginPath();c.moveTo(o.x,o.y);for(var i=0;i<pts.length;i++)c.lineTo(pts[i].x,pts[i].y);c.closePath();}
 var UI={r:document.getElementById('r'),d:document.getElementById('d'),s:document.getElementById('s'),ro:document.getElementById('ro'),d2:document.getElementById('do'),s2:document.getElementById('so'),read:document.getElementById('readout')};
-function syncUI(){var R=+UI.r.value,D=+UI.d.value,S=+UI.s.value;UI.ro.value=R;UI.d2.value=D.toFixed(2);UI.s2.value=Math.round(S*100)+'%';UI.read.innerHTML='vis='+R+' &nbsp; dark='+D.toFixed(2)+' &nbsp; soft='+S.toFixed(2)+'<br><b>?vis='+R+'&amp;dark='+D.toFixed(2)+'&amp;soft='+S.toFixed(2)+'</b>';}
+function syncUI(){var R=+UI.r.value,D=+UI.d.value,S=+UI.s.value;UI.ro.value=R;UI.d2.value=D.toFixed(2);UI.s2.value=Math.round(S*100)+'%';UI.read.innerHTML='vis='+R+' &nbsp; dark='+D.toFixed(2)+' &nbsp; soft='+S.toFixed(2)+' &nbsp; 补墙='+manual.length+'<br><b>?vis='+R+'&amp;dark='+D.toFixed(2)+'&amp;soft='+S.toFixed(2)+'</b>';}
 UI.r.oninput=UI.d.oninput=UI.s.oninput=syncUI;
-document.getElementById('bRay').onclick=function(e){showRay=!showRay;e.target.classList.toggle('on',showRay);};
 document.getElementById('bWall').onclick=function(e){showWall=!showWall;e.target.classList.toggle('on',showWall);};
+document.getElementById('bRay').onclick=function(e){showRay=!showRay;e.target.classList.toggle('on',showRay);};
 document.getElementById('bGod').onclick=function(e){god=!god;e.target.classList.toggle('on',god);};
+document.getElementById('bDraw').onclick=function(e){drawing=!drawing;p1=null;e.target.classList.toggle('on',drawing);if(drawing)UI.read.textContent='画墙：点两个点连成一条墙线';};
+document.getElementById('bUndo').onclick=function(){if(manual.length){var m=manual.pop();for(var i=SEGS.length-1;i>=0;i--){if(SEGS[i].manual){SEGS.splice(i,1);break;}}syncUI();}};
+document.getElementById('bDump').onclick=function(){var lines=manual.map(function(m){return '[[ '+m[0]+', '+m[1]+' ], [ '+m[2]+', '+m[3]+' ]]';});var txt='var WALL_FIX = [\n  '+lines.join(',\n  ')+'\n];';UI.read.textContent=txt;if(navigator.clipboard)navigator.clipboard.writeText(txt);};
 document.getElementById('bCopy').onclick=function(){var t='vis='+UI.r.value+' dark='+(+UI.d.value).toFixed(2)+' soft='+(+UI.s.value).toFixed(2);if(navigator.clipboard)navigator.clipboard.writeText(t);UI.read.textContent='已复制：'+t;setTimeout(syncUI,1400);};
 function resize(){dpr=Math.min(window.devicePixelRatio||1,2);VW=window.innerWidth;VH=window.innerHeight;cv.width=Math.round(VW*dpr);cv.height=Math.round(VH*dpr);lcv.width=cv.width;lcv.height=cv.height;fcv.width=cv.width;fcv.height=cv.height;ctx.setTransform(dpr,0,0,dpr,0,0);scale=VW/VIEWW;}
 addEventListener('resize',resize);resize();
-cv.addEventListener('pointerdown',function(e){me.x=Math.max(20,Math.min(MAPW-20,me.x+(e.clientX-VW/2)/scale));me.y=Math.max(20,Math.min(MAPH-20,me.y+(e.clientY-VH/2)/scale));});
-cv.addEventListener('pointermove',function(e){if(!e.buttons)return;me.x=Math.max(20,Math.min(MAPW-20,me.x+(e.movementX||0)/scale));me.y=Math.max(20,Math.min(MAPH-20,me.y+(e.movementY||0)/scale));});
-function frame(){if(ready){var R=+UI.r.value,DARK=+UI.d.value,SOFT=+UI.s.value,softStart=1-SOFT;var o={x:me.x,y:me.y};var vis=visibility(o,R);camX=o.x-(VW/2)/scale;camY=o.y-(VH/2)/scale;ctx.fillStyle='#05080d';ctx.fillRect(0,0,VW,VH);ctx.save();ctx.scale(scale,scale);ctx.translate(-camX,-camY);if(mapImg.complete)ctx.drawImage(mapImg,0,0,MAPW,MAPH);if(showWall){ctx.strokeStyle='rgba(95,216,232,.45)';ctx.lineWidth=1.2/scale;ctx.beginPath();for(var i=0;i<vis.segs.length;i++){var s=vis.segs[i];ctx.moveTo(s.a.x,s.a.y);ctx.lineTo(s.b.x,s.b.y);}ctx.stroke();}if(crewImg.complete)ctx.drawImage(crewImg,o.x-16,o.y-26,32,32);ctx.restore();lctx.setTransform(dpr,0,0,dpr,0,0);fctx.setTransform(dpr,0,0,dpr,0,0);lctx.clearRect(0,0,VW,VH);if(!god){lctx.save();lctx.scale(scale,scale);lctx.translate(-camX,-camY);polyPath(lctx,o,vis.pts);lctx.fillStyle='#fff';lctx.fill();lctx.restore();lctx.globalCompositeOperation='destination-in';var sx=o.x*scale-camX*scale,sy=o.y*scale-camY*scale;var g=lctx.createRadialGradient(sx,sy,Math.max(0.01,R*softStart*scale),sx,sy,R*scale);for(var k=0;k<=12;k++){var u=k/12,dd=R*softStart+u*(R-R*softStart);g.addColorStop(u,'rgba(255,255,255,'+radialFade(dd,R,softStart).toFixed(3)+')');}lctx.fillStyle=g;lctx.fillRect(0,0,VW,VH);lctx.globalCompositeOperation='source-over';fctx.clearRect(0,0,VW,VH);fctx.fillStyle='rgba(11,19,34,'+DARK+')';fctx.fillRect(0,0,VW,VH);fctx.globalCompositeOperation='destination-out';fctx.drawImage(lcv,0,0,VW,VH);fctx.globalCompositeOperation='source-over';ctx.drawImage(fcv,0,0,VW,VH);}if(showRay&&!god){ctx.save();ctx.scale(scale,scale);ctx.translate(-camX,-camY);ctx.strokeStyle='rgba(95,216,232,.15)';ctx.lineWidth=1/scale;ctx.beginPath();for(var j=0;j<vis.pts.length;j++){ctx.moveTo(o.x,o.y);ctx.lineTo(vis.pts[j].x,vis.pts[j].y);}ctx.stroke();ctx.fillStyle='rgba(255,213,74,.85)';for(var m=0;m<vis.pts.length;m++){ctx.beginPath();ctx.arc(vis.pts[m].x,vis.pts[m].y,1.8/scale,0,6.284);ctx.fill();}ctx.restore();}}
+function toWorld(e){return {x:me.x+(e.clientX-VW/2)/scale, y:me.y+(e.clientY-VH/2)/scale};}
+cv.addEventListener('pointerdown',function(e){
+  if(drawing){
+    var w=toWorld(e);
+    if(!p1){p1=w;UI.read.textContent='画墙：再点第二个点';return;}
+    var seg={a:{x:p1.x,y:p1.y},b:{x:w.x,y:w.y},minx:Math.min(p1.x,w.x),miny:Math.min(p1.y,w.y),maxx:Math.max(p1.x,w.x),maxy:Math.max(p1.y,w.y),manual:true};
+    SEGS.push(seg);CORNERS.push({x:p1.x,y:p1.y});
+    manual.push([Math.round(p1.x),Math.round(p1.y),Math.round(w.x),Math.round(w.y)]);
+    p1=null;syncUI();return;
+  }
+  var w=toWorld(e);me.x=Math.max(20,Math.min(MAPW-20,w.x));me.y=Math.max(20,Math.min(MAPH-20,w.y));
+});
+function frame(){if(ready){var R=+UI.r.value,DARK=+UI.d.value,SOFT=+UI.s.value,softStart=1-SOFT;var o={x:me.x,y:me.y};var vis=visibility(o,R);camX=o.x-(VW/2)/scale;camY=o.y-(VH/2)/scale;ctx.fillStyle='#05080d';ctx.fillRect(0,0,VW,VH);ctx.save();ctx.scale(scale,scale);ctx.translate(-camX,-camY);if(mapImg.complete)ctx.drawImage(mapImg,0,0,MAPW,MAPH);if(showWall){ctx.strokeStyle='rgba(95,216,232,.45)';ctx.lineWidth=1.2/scale;ctx.beginPath();for(var i=0;i<vis.segs.length;i++){var s=vis.segs[i];ctx.moveTo(s.a.x,s.a.y);ctx.lineTo(s.b.x,s.b.y);}ctx.stroke();}ctx.strokeStyle='rgba(255,120,180,.9)';ctx.lineWidth=2/scale;ctx.beginPath();for(var i2=0;i2<manual.length;i2++){var m=manual[i2];ctx.moveTo(m[0],m[1]);ctx.lineTo(m[2],m[3]);}ctx.stroke();if(p1){ctx.fillStyle='#ff78b4';ctx.beginPath();ctx.arc(p1.x,p1.y,4/scale,0,6.284);ctx.fill();}if(crewImg.complete)ctx.drawImage(crewImg,o.x-16,o.y-26,32,32);ctx.restore();lctx.setTransform(dpr,0,0,dpr,0,0);fctx.setTransform(dpr,0,0,dpr,0,0);lctx.clearRect(0,0,VW,VH);if(!god){lctx.save();lctx.scale(scale,scale);lctx.translate(-camX,-camY);polyPath(lctx,o,vis.pts);lctx.fillStyle='#fff';lctx.fill();lctx.restore();lctx.globalCompositeOperation='destination-in';var sx=o.x*scale-camX*scale,sy=o.y*scale-camY*scale;var g=lctx.createRadialGradient(sx,sy,Math.max(0.01,R*softStart*scale),sx,sy,R*scale);for(var k=0;k<=12;k++){var u=k/12,dd=R*softStart+u*(R-R*softStart);g.addColorStop(u,'rgba(255,255,255,'+radialFade(dd,R,softStart).toFixed(3)+')');}lctx.fillStyle=g;lctx.fillRect(0,0,VW,VH);lctx.globalCompositeOperation='source-over';fctx.clearRect(0,0,VW,VH);fctx.fillStyle='rgba(11,19,34,'+DARK+')';fctx.fillRect(0,0,VW,VH);fctx.globalCompositeOperation='destination-out';fctx.drawImage(lcv,0,0,VW,VH);fctx.globalCompositeOperation='source-over';ctx.drawImage(fcv,0,0,VW,VH);}if(showRay&&!god){ctx.save();ctx.scale(scale,scale);ctx.translate(-camX,-camY);ctx.strokeStyle='rgba(95,216,232,.15)';ctx.lineWidth=1/scale;ctx.beginPath();for(var j=0;j<vis.pts.length;j++){ctx.moveTo(o.x,o.y);ctx.lineTo(vis.pts[j].x,vis.pts[j].y);}ctx.stroke();ctx.restore();}}
 requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 </script>
