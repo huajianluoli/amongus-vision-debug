@@ -5,21 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>视野参数调试 · Among Us</title>
 <style>
-:root{--line:#243145;--text:#e7edf7;--muted:#8b9bb3;--accent:#ffd54a;--cyan:#5fd8e8}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:#080c14;color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+html,body{margin:0;height:100%;background:#080c14;color:#e7edf7;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;overflow:hidden}
 #cv{display:block;width:100%;height:100%;touch-action:none}
-.top{position:fixed;left:0;right:0;top:0;padding:10px 12px;pointer-events:none}
-.readout{font:12px ui-monospace,Menlo,monospace;color:var(--cyan);line-height:1.7;background:rgba(8,12,20,.72);display:inline-block;padding:5px 9px;border-radius:8px;max-width:96vw}
-.readout b{color:#fff}
-.hint{font-size:11px;color:var(--muted);margin-top:4px}
-.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(11,17,26,.95);border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
-.row{display:flex;align-items:center;gap:8px;margin:5px 0}
-.row label{font-size:12px;color:var(--muted);width:58px;flex:none}
-.row input{flex:1;accent-color:var(--accent);height:18px}
-.row output{font:12px ui-monospace,Menlo,monospace;color:#fff;width:48px;text-align:right;flex:none}
-.btns{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
-button{background:#1c2737;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11px;flex:none}
+.top{position:fixed;left:0;right:0;top:0;padding:9px 11px;pointer-events:none}
+.readout{font:12px ui-monospace,Menlo,monospace;color:#5fd8e8;line-height:1.7;background:rgba(8,12,20,.75);display:inline-block;padding:5px 9px;border-radius:8px;max-width:97vw}
+.hint{font-size:10.5px;color:#8b9bb3;margin-top:3px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(11,17,26,.95);border-top:1px solid #243145;padding:7px 9px calc(7px + env(safe-area-inset-bottom))}
+.row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.row label{font-size:11.5px;color:#8b9bb3;width:56px;flex:none}
+.row input{flex:1;accent-color:#ffd54a;height:18px}
+.row output{font:11.5px ui-monospace,Menlo,monospace;color:#fff;width:46px;text-align:right;flex:none}
+.btns{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+button{background:#1c2737;color:#e7edf7;border:1px solid #243145;border-radius:7px;padding:5px 7px;font-size:10.5px;line-height:1.2}
 button.on{background:#2b3f26;border-color:#5f8a4a;color:#b8e89c}
 button.cp{background:#233a52;border-color:#3d6a94;color:#9fd0f5}
 button.warn{background:#3d2530;border-color:#8a5468;color:#f5b0c0}
@@ -29,7 +26,7 @@ button.warn{background:#3d2530;border-color:#8a5468;color:#f5b0c0}
 <canvas id="cv"></canvas>
 <div class="top">
 <div class="readout" id="readout">加载中…</div>
-<div class="hint">点地图移动船员 · 可透视处开“画墙”补一条</div>
+<div class="hint">点地图移动船员 · 能透视的地方就用“画墙”补一条</div>
 </div>
 <div class="bar">
 <div class="row"><label>视野半径</label><input id="r" type="range" min="120" max="520" value="270" step="5"><output id="ro">270</output></div>
@@ -52,7 +49,7 @@ var drawing=false,p1=null,manual=[];
 var mapImg=new Image(),crewImg=new Image();
 mapImg.src=MAP_SRC;crewImg.src=CREW_SRC;
 function addSeg(ax,ay,bx,by){SEGS.push({a:{x:ax,y:ay},b:{x:bx,y:by},minx:Math.min(ax,bx),miny:Math.min(ay,by),maxx:Math.max(ax,bx),maxy:Math.max(ay,by)});CORNERS.push({x:ax,y:ay});}
-function load(){fetch(WALLS_URL).then(function(r){return r.json();}).then(function(w){MAPW=w.mapW||2040;MAPH=w.mapH||1140;SEGS=[];CORNERS=[];w.edges.forEach(function(e){addSeg(e.pts[0][0],e.pts[0][1],e.pts[1][0],e.pts[1][1]);});ready=true;syncUI();}).catch(function(e){document.getElementById('readout').textContent='数据加载失败：'+e.message;});}
+function load(){fetch(WALLS_URL).then(function(r){return r.json();}).then(function(w){MAPW=w.mapW||2040;MAPH=w.mapH||1140;SEGS=[];CORNERS=[];w.edges.forEach(function(e){addSeg(e.pts[0][0],e.pts[0][1],e.pts[1][0],e.pts[1][1]);});ready=true;syncUI();}).catch(function(e){document.getElementById('readout').textContent='数据加载失败:'+e.message;});}
 load();
 function segNear(s,o,R){var mx=(s.minx+s.maxx)/2,my=(s.miny+s.maxy)/2;var r=Math.sqrt(Math.pow(s.maxx-s.minx,2)+Math.pow(s.maxy-s.miny,2))/2+R;return Math.pow(mx-o.x,2)+Math.pow(my-o.y,2)<=r*r;}
 function cast(o,ang,maxD,segs){var dx=Math.cos(ang),dy=Math.sin(ang),best=maxD;for(var i=0;i<segs.length;i++){var s=segs[i],sx=s.b.x-s.a.x,sy=s.b.y-s.a.y,den=dx*sy-dy*sx;if(den>-1e-9&&den<1e-9)continue;var qx=s.a.x-o.x,qy=s.a.y-o.y;var t=(qx*sy-qy*sx)/den,u=(qx*dy-qy*dx)/den;if(t>1e-6&&t<best&&u>=0&&u<=1)best=t;}return best;}
@@ -61,15 +58,15 @@ function visibility(o,R){var segs=SEGS.filter(function(s){return segNear(s,o,R);
 function radialFade(d,R,softStart){var band=Math.max(1,R-R*softStart);var t=Math.max(0,Math.min(1,(R-d)/band));return t*t*(3-2*t);}
 function polyPath(c,o,pts){c.beginPath();c.moveTo(o.x,o.y);for(var i=0;i<pts.length;i++)c.lineTo(pts[i].x,pts[i].y);c.closePath();}
 var UI={r:document.getElementById('r'),d:document.getElementById('d'),s:document.getElementById('s'),ro:document.getElementById('ro'),d2:document.getElementById('do'),s2:document.getElementById('so'),read:document.getElementById('readout')};
-function syncUI(){var R=+UI.r.value,D=+UI.d.value,S=+UI.s.value;UI.ro.value=R;UI.d2.value=D.toFixed(2);UI.s2.value=Math.round(S*100)+'%';UI.read.innerHTML='vis='+R+' &nbsp; dark='+D.toFixed(2)+' &nbsp; soft='+S.toFixed(2)+' &nbsp; 补墙='+manual.length+'<br><b>?vis='+R+'&amp;dark='+D.toFixed(2)+'&amp;soft='+S.toFixed(2)+'</b>';}
+function syncUI(){var R=+UI.r.value,D=+UI.d.value,S=+UI.s.value;UI.ro.value=R;UI.d2.value=D.toFixed(2);UI.s2.value=Math.round(S*100)+'%';UI.read.innerHTML='vis='+R+' dark='+D.toFixed(2)+' soft='+S.toFixed(2)+' fix='+manual.length+'<br><b>?vis='+R+'&amp;dark='+D.toFixed(2)+'&amp;soft='+S.toFixed(2)+'</b>';}
 UI.r.oninput=UI.d.oninput=UI.s.oninput=syncUI;
 document.getElementById('bWall').onclick=function(e){showWall=!showWall;e.target.classList.toggle('on',showWall);};
 document.getElementById('bRay').onclick=function(e){showRay=!showRay;e.target.classList.toggle('on',showRay);};
 document.getElementById('bGod').onclick=function(e){god=!god;e.target.classList.toggle('on',god);};
-document.getElementById('bDraw').onclick=function(e){drawing=!drawing;p1=null;e.target.classList.toggle('on',drawing);if(drawing)UI.read.textContent='画墙：点两个点连成一条墙线';};
+document.getElementById('bDraw').onclick=function(e){drawing=!drawing;p1=null;e.target.classList.toggle('on',drawing);if(drawing)UI.read.textContent='画墙：点两个点';};
 document.getElementById('bUndo').onclick=function(){if(manual.length){manual.pop();for(var i=SEGS.length-1;i>=0;i--){if(SEGS[i].manual){SEGS.splice(i,1);break;}}syncUI();}};
-document.getElementById('bDump').onclick=function(){var lines=manual.map(function(m){return '  [['+m[0]+','+m[1]+'],['+m[2]+','+m[3]+']]';});var txt='['+lines.join(',')+']';UI.read.textContent='已复制补墙：'+txt;if(navigator.clipboard)navigator.clipboard.writeText(txt);};
-document.getElementById('bCopy').onclick=function(){var t='vis='+UI.r.value+' dark='+(+UI.d.value).toFixed(2)+' soft='+(+UI.s.value).toFixed(2)+' walls='+manual.length;if(navigator.clipboard)navigator.clipboard.writeText(t);UI.read.textContent='已复制：'+t;setTimeout(syncUI,1400);};
+document.getElementById('bDump').onclick=function(){var lines=manual.map(function(m){return '[['+m[0]+','+m[1]+'],['+m[2]+','+m[3]+']]';});var txt='['+lines.join(',')+']';UI.read.textContent='已复制：'+txt;if(navigator.clipboard)navigator.clipboard.writeText(txt);};
+document.getElementById('bCopy').onclick=function(){var t='vis='+UI.r.value+' dark='+(+UI.d.value).toFixed(2)+' soft='+(+UI.s.value).toFixed(2);if(navigator.clipboard)navigator.clipboard.writeText(t);UI.read.textContent='已复制：'+t;setTimeout(syncUI,1400);};
 function resize(){dpr=Math.min(window.devicePixelRatio||1,2);VW=window.innerWidth;VH=window.innerHeight;cv.width=Math.round(VW*dpr);cv.height=Math.round(VH*dpr);lcv.width=cv.width;lcv.height=cv.height;fcv.width=cv.width;fcv.height=cv.height;ctx.setTransform(dpr,0,0,dpr,0,0);scale=VW/VIEWW;}
 addEventListener('resize',resize);resize();
 function toWorld(e){return {x:me.x+(e.clientX-VW/2)/scale, y:me.y+(e.clientY-VH/2)/scale};}
